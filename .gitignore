@@ -1,0 +1,29 @@
+# Local worktrees (do not commit)
+worktrees/
+
+# Docker compose env (secrets/local overrides)
+deploy/compose.env
+deploy/.env
+.env
+
+# Windows metadata
+*:Zone.Identifier
+*.Zone.Identifier
+
+# IDE
+.idea/
+.vscode/
+
+# Backend (Spring Boot)
+**/target/
+**/.classpath
+**/.project
+**/.settings/
+
+# Frontend (Vue)
+**/node_modules/
+**/dist/
+**/.pnpm-store/
+**/.npm/
+**/.yarn/
+

@@ -1,0 +1,62 @@
+server:
+  port: ${SERVER_PORT:8080}
+
+spring:
+  application:
+    name: elevator-backend
+
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:elevator}
+    username: ${DB_USER:elevator}
+    password: ${DB_PASSWORD:elevator_pwd}
+
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+
+  flyway:
+    enabled: true
+
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+elevator:
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://127.0.0.1:5173}
+  mqtt:
+    enabled: ${MQTT_ENABLED:false}
+    brokerUrl: ${MQTT_BROKER_URL:tcp://localhost:1883}
+    username: ${MQTT_USERNAME:}
+    password: ${MQTT_PASSWORD:}
+    clientId: ${MQTT_CLIENT_ID:elevator-backend-dev}
+    topicData: ${MQTT_TOPIC_DATA:elevator/+/data}
+    topicAlert: ${MQTT_TOPIC_ALERT:elevator/+/alert}
+    offline-check-ms: ${MQTT_OFFLINE_CHECK_MS:5000}
+  iotdb:
+    host: ${IOTDB_HOST:localhost}
+    port: ${IOTDB_PORT:6667}
+    username: ${IOTDB_USERNAME:root}
+    password: ${IOTDB_PASSWORD:root}
+  simulator:
+    enabled: ${SIMULATOR_ENABLED:false}
+    device-count: ${SIMULATOR_DEVICE_COUNT:5}
+    publish-interval-ms: ${SIMULATOR_PUBLISH_INTERVAL_MS:1000}
+    min-floor: ${SIMULATOR_MIN_FLOOR:1}
+    max-floor: ${SIMULATOR_MAX_FLOOR:20}
+    offline-chance: ${SIMULATOR_OFFLINE_CHANCE:0.001}
+    offline-seconds-min: ${SIMULATOR_OFFLINE_SECONDS_MIN:20}
+    offline-seconds-max: ${SIMULATOR_OFFLINE_SECONDS_MAX:60}
+    trapped-chance: ${SIMULATOR_TRAPPED_CHANCE:0.0005}

@@ -1,0 +1,322 @@
+openapi: 3.0.3
+info:
+  title: Elevator Ops Platform API
+  version: 0.1.0
+  description: |
+    前后端联调契约（以接口为准）。
+
+servers:
+  - url: http://127.0.0.1:8080
+
+tags:
+  - name: Health
+  - name: Auth
+  - name: Alarms
+  - name: Devices
+
+paths:
+  /api/ping:
+    get:
+      tags: [Health]
+      summary: Health check
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+
+  /api/auth/login:
+    post:
+      tags: [Auth]
+      summary: Login (dev token)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /api/auth/me:
+    get:
+      tags: [Auth]
+      summary: Current user
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MeResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/alarms:
+    get:
+      tags: [Alarms]
+      summary: List alarms (paged)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: page
+          schema: { type: integer, minimum: 0, default: 0 }
+        - in: query
+          name: size
+          schema: { type: integer, minimum: 1, maximum: 200, default: 20 }
+        - in: query
+          name: sort
+          description: Spring pageable sort, e.g. `occurredAt,desc`
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageAlarmDto"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/alarms/{id}:
+    get:
+      tags: [Alarms]
+      summary: Get alarm by id
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer, format: int64 }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AlarmDto"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/devices:
+    get:
+      tags: [Devices]
+      summary: List devices (paged)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: page
+          schema: { type: integer, minimum: 0, default: 0 }
+        - in: query
+          name: size
+          schema: { type: integer, minimum: 1, maximum: 200, default: 20 }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageDeviceStateDto"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/devices/{deviceId}/realtime:
+    get:
+      tags: [Devices]
+      summary: Device realtime snapshot (Redis-first)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: deviceId
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeviceStateDto"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/devices/{deviceId}/events:
+    get:
+      tags: [Devices]
+      summary: Device state change events (paged)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: deviceId
+          required: true
+          schema: { type: string }
+        - in: query
+          name: page
+          schema: { type: integer, minimum: 0, default: 0 }
+        - in: query
+          name: size
+          schema: { type: integer, minimum: 1, maximum: 200, default: 20 }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageDeviceStateChangeDto"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  responses:
+    BadRequest:
+      description: Bad Request
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    NotFound:
+      description: Not Found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+  schemas:
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username: { type: string, minLength: 1 }
+        password: { type: string, minLength: 1 }
+
+    LoginResponse:
+      type: object
+      required: [accessToken, tokenType, expiresIn]
+      properties:
+        accessToken: { type: string }
+        tokenType: { type: string, example: Bearer }
+        expiresIn: { type: integer, format: int64, example: 86400 }
+
+    MeResponse:
+      type: object
+      required: [username, role]
+      properties:
+        username: { type: string }
+        role:
+          type: string
+          description: 临时角色枚举（后续会替换为真实 RBAC）
+          enum: [NATIONAL, PROVINCE, CITY]
+
+    AlarmDto:
+      type: object
+      required: [id, deviceId, level, type, occurredAt, createdAt]
+      properties:
+        id: { type: integer, format: int64 }
+        deviceId: { type: string }
+        level: { type: string, example: red }
+        type: { type: string, example: trapped }
+        description: { type: string, nullable: true }
+        occurredAt: { type: string, format: date-time }
+        createdAt: { type: string, format: date-time }
+
+    PageAlarmDto:
+      type: object
+      required: [content, totalElements, totalPages, page, size]
+      properties:
+        content:
+          type: array
+          items: { $ref: "#/components/schemas/AlarmDto" }
+        totalElements: { type: integer, format: int64 }
+        totalPages: { type: integer }
+        page: { type: integer, minimum: 0 }
+        size: { type: integer, minimum: 1 }
+
+    DeviceStateDto:
+      type: object
+      required: [deviceId, online, lastSeenAt]
+      properties:
+        deviceId: { type: string }
+        online: { type: boolean }
+        lastSeenAt: { type: string, format: date-time }
+        floor: { type: integer, nullable: true }
+        direction: { type: string, nullable: true, example: up }
+        doorStatus: { type: string, nullable: true, example: closed }
+        speed: { type: number, format: double, nullable: true }
+        load: { type: number, format: double, nullable: true }
+        temperature: { type: number, format: double, nullable: true }
+        vibration: { type: number, format: double, nullable: true }
+        power: { type: number, format: double, nullable: true }
+
+    DeviceStateChangeDto:
+      type: object
+      required: [id, deviceId, eventType, occurredAt]
+      properties:
+        id: { type: integer, format: int64 }
+        deviceId: { type: string }
+        eventType: { type: string, example: OFFLINE }
+        details: { type: string, nullable: true }
+        occurredAt: { type: string, format: date-time }
+
+    PageDeviceStateDto:
+      type: object
+      required: [content, totalElements, totalPages, page, size]
+      properties:
+        content:
+          type: array
+          items: { $ref: "#/components/schemas/DeviceStateDto" }
+        totalElements: { type: integer, format: int64 }
+        totalPages: { type: integer }
+        page: { type: integer, minimum: 0 }
+        size: { type: integer, minimum: 1 }
+
+    PageDeviceStateChangeDto:
+      type: object
+      required: [content, totalElements, totalPages, page, size]
+      properties:
+        content:
+          type: array
+          items: { $ref: "#/components/schemas/DeviceStateChangeDto" }
+        totalElements: { type: integer, format: int64 }
+        totalPages: { type: integer }
+        page: { type: integer, minimum: 0 }
+        size: { type: integer, minimum: 1 }
+
+    ErrorResponse:
+      type: object
+      required: [code, message]
+      properties:
+        code: { type: string, example: BAD_REQUEST }
+        message: { type: string }

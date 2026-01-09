@@ -1,0 +1,57 @@
+name: elevator-demo
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: elevator-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-elevator}
+      POSTGRES_USER: ${POSTGRES_USER:-elevator}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-elevator_pwd}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: elevator-redis
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  emqx:
+    image: emqx/emqx:5.6.1
+    container_name: elevator-emqx
+    environment:
+      EMQX_DASHBOARD__DEFAULT_USERNAME: ${EMQX_DASHBOARD_USERNAME:-admin}
+      EMQX_DASHBOARD__DEFAULT_PASSWORD: ${EMQX_DASHBOARD_PASSWORD:-public}
+    ports:
+      - "${EMQX_MQTT_PORT:-1883}:1883"     # MQTT TCP
+      - "${EMQX_WS_PORT:-8083}:8083"       # MQTT over WebSocket
+      - "${EMQX_DASHBOARD_PORT:-18083}:18083"
+    volumes:
+      - emqxdata:/opt/emqx/data
+      - emqxlog:/opt/emqx/log
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  redisdata:
+  emqxdata:
+  emqxlog:
+
