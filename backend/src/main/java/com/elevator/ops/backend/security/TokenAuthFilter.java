@@ -3,6 +3,7 @@ package com.elevator.ops.backend.security;
 import com.elevator.ops.backend.web.error.ErrorResponse;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.HttpHeaders;
@@ -51,15 +52,35 @@ public class TokenAuthFilter extends OncePerRequestFilter {
     }
 
     String token = authorization.startsWith("Bearer ") ? authorization.substring("Bearer ".length()) : authorization;
-    String username = stringRedisTemplate.opsForValue().get(TOKEN_PREFIX + token);
-    if (username == null || username.isBlank()) {
+    String json = stringRedisTemplate.opsForValue().get(TOKEN_PREFIX + token);
+    if (json == null || json.isBlank()) {
       unauthorized(response, "Invalid token");
       return;
     }
 
+    UserPrincipal principal;
+    try {
+      principal = objectMapper.readValue(json, UserPrincipal.class);
+    } catch (Exception e) {
+      unauthorized(response, "Invalid token payload");
+      return;
+    }
+
+    List<SimpleGrantedAuthority> authorities = new ArrayList<>();
+    if (principal.role() != null) {
+      authorities.add(new SimpleGrantedAuthority("ROLE_" + principal.role().name()));
+    }
+    if (principal.permissions() != null) {
+      for (String permission : principal.permissions()) {
+        if (permission != null && !permission.isBlank()) {
+          authorities.add(new SimpleGrantedAuthority(permission));
+        }
+      }
+    }
+
     UsernamePasswordAuthenticationToken authentication =
         new UsernamePasswordAuthenticationToken(
-            username, null, List.of(new SimpleGrantedAuthority("ROLE_CITY")));
+            principal, null, authorities);
     SecurityContextHolder.getContext().setAuthentication(authentication);
     filterChain.doFilter(request, response);
   }
@@ -70,4 +91,3 @@ public class TokenAuthFilter extends OncePerRequestFilter {
     objectMapper.writeValue(response.getOutputStream(), new ErrorResponse("UNAUTHORIZED", message));
   }
 }
-

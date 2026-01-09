@@ -4,6 +4,7 @@ import com.elevator.ops.backend.persistence.device.DeviceState;
 import com.elevator.ops.backend.persistence.device.DeviceStateChange;
 import com.elevator.ops.backend.persistence.device.DeviceStateChangeRepository;
 import com.elevator.ops.backend.persistence.device.DeviceStateRepository;
+import com.elevator.ops.backend.security.UserPrincipal;
 import com.elevator.ops.backend.web.common.PageResponse;
 import com.elevator.ops.backend.web.error.ApiException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -12,6 +13,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -39,13 +41,21 @@ public class DeviceController {
   }
 
   @GetMapping
-  public PageResponse<DeviceStateDto> list(@PageableDefault(size = 20) Pageable pageable) {
-    Page<DeviceStateDto> page = deviceStateRepository.findAll(pageable).map(DeviceController::toDto);
+  public PageResponse<DeviceStateDto> list(
+      @AuthenticationPrincipal UserPrincipal principal, @PageableDefault(size = 20) Pageable pageable) {
+    Page<DeviceStateDto> page =
+        (principal != null && principal.deviceNoFrom() != null && principal.deviceNoTo() != null)
+            ? deviceStateRepository.findByDeviceIdIn(principal.deviceIdScope(), pageable).map(DeviceController::toDto)
+            : deviceStateRepository.findAll(pageable).map(DeviceController::toDto);
     return new PageResponse<>(page.getContent(), page.getTotalElements(), page.getTotalPages(), page.getNumber(), page.getSize());
   }
 
   @GetMapping("/{deviceId}/realtime")
-  public DeviceStateDto realtime(@PathVariable String deviceId) {
+  public DeviceStateDto realtime(@AuthenticationPrincipal UserPrincipal principal, @PathVariable String deviceId) {
+    if (principal != null && !principal.canAccessDevice(deviceId)) {
+      throw ApiException.notFound("Device not found: " + deviceId);
+    }
+
     String json = stringRedisTemplate.opsForValue().get(REDIS_KEY_STATE_PREFIX + deviceId);
     if (json != null && !json.isBlank()) {
       try {
@@ -64,7 +74,12 @@ public class DeviceController {
 
   @GetMapping("/{deviceId}/events")
   public PageResponse<DeviceStateChangeDto> events(
-      @PathVariable String deviceId, @PageableDefault(size = 20) Pageable pageable) {
+      @AuthenticationPrincipal UserPrincipal principal,
+      @PathVariable String deviceId,
+      @PageableDefault(size = 20) Pageable pageable) {
+    if (principal != null && !principal.canAccessDevice(deviceId)) {
+      throw ApiException.notFound("Device not found: " + deviceId);
+    }
     Page<DeviceStateChangeDto> page =
         deviceStateChangeRepository
             .findByDeviceIdOrderByOccurredAtDesc(deviceId, pageable)
@@ -93,4 +108,3 @@ public class DeviceController {
         change.getId(), change.getDeviceId(), change.getEventType(), change.getDetails(), change.getOccurredAt());
   }
 }
-

@@ -224,21 +224,30 @@ components:
 
     LoginResponse:
       type: object
-      required: [accessToken, tokenType, expiresIn]
+      required: [accessToken, tokenType, expiresIn, user]
       properties:
         accessToken: { type: string }
         tokenType: { type: string, example: Bearer }
         expiresIn: { type: integer, format: int64, example: 86400 }
+        user:
+          $ref: "#/components/schemas/MeResponse"
 
     MeResponse:
       type: object
-      required: [username, role]
+      required: [userId, username, name, role, permissions]
       properties:
+        userId: { type: string, example: "1001" }
         username: { type: string }
+        name: { type: string }
         role:
           type: string
-          description: 临时角色枚举（后续会替换为真实 RBAC）
-          enum: [NATIONAL, PROVINCE, CITY]
+          description: Demo role enum (for frontend permission skeleton)
+          enum: [CITY_OPERATOR, PROVINCE_SUPERVISOR, NATIONAL_ADMIN]
+        region: { type: string, nullable: true, description: 数据范围-省/全国 }
+        city: { type: string, nullable: true, description: 数据范围-市 }
+        permissions:
+          type: array
+          items: { type: string }
 
     AlarmDto:
       type: object

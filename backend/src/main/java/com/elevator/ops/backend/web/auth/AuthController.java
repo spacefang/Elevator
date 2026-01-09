@@ -1,6 +1,9 @@
 package com.elevator.ops.backend.web.auth;
 
+import com.elevator.ops.backend.security.UserCatalog;
+import com.elevator.ops.backend.security.UserPrincipal;
 import com.elevator.ops.backend.web.error.ApiException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Duration;
 import java.util.UUID;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -19,9 +22,13 @@ public class AuthController {
   private static final String TOKEN_PREFIX = "auth:token:";
 
   private final StringRedisTemplate stringRedisTemplate;
+  private final ObjectMapper objectMapper;
+  private final UserCatalog userCatalog;
 
-  public AuthController(StringRedisTemplate stringRedisTemplate) {
+  public AuthController(StringRedisTemplate stringRedisTemplate, ObjectMapper objectMapper, UserCatalog userCatalog) {
     this.stringRedisTemplate = stringRedisTemplate;
+    this.objectMapper = objectMapper;
+    this.userCatalog = userCatalog;
   }
 
   @PostMapping("/login")
@@ -30,16 +37,39 @@ public class AuthController {
       throw ApiException.badRequest("username/password required");
     }
 
+    UserPrincipal principal = userCatalog.authenticate(request.username(), request.password());
+    if (principal == null) {
+      throw ApiException.unauthorized("Invalid username/password");
+    }
+
     String token = UUID.randomUUID().toString();
-    stringRedisTemplate.opsForValue().set(TOKEN_PREFIX + token, request.username(), TOKEN_TTL);
-    return new LoginResponse(token, "Bearer", TOKEN_TTL.toSeconds());
+    try {
+      stringRedisTemplate
+          .opsForValue()
+          .set(TOKEN_PREFIX + token, objectMapper.writeValueAsString(principal), TOKEN_TTL);
+    } catch (Exception e) {
+      throw ApiException.badRequest("Failed to create token");
+    }
+
+    return new LoginResponse(token, "Bearer", TOKEN_TTL.toSeconds(), toMeResponse(principal));
   }
 
   @GetMapping("/me")
-  public MeResponse me(@AuthenticationPrincipal String username) {
-    if (username == null || username.isBlank()) {
-      throw ApiException.unauthorized("Invalid token");
+  public MeResponse me(@AuthenticationPrincipal UserPrincipal principal) {
+    if (principal == null) {
+      throw ApiException.unauthorized("Invalid token/principal");
     }
-    return new MeResponse(username, "CITY");
+    return toMeResponse(principal);
+  }
+
+  private static MeResponse toMeResponse(UserPrincipal principal) {
+    return new MeResponse(
+        principal.userId(),
+        principal.username(),
+        principal.name(),
+        principal.role().name(),
+        principal.region(),
+        principal.city(),
+        principal.permissions());
   }
 }
