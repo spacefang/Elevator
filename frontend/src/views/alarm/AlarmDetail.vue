@@ -76,11 +76,14 @@
         <!-- 操作面板 -->
         <el-card class="mb-4 shadow-sm !border-none" header="快捷操作">
           <div class="flex space-x-4 mb-4" v-if="alarmData.status !== 'CLOSED'">
-            <el-button type="primary" size="large" class="flex-1" @click="handleAction('process')">
+            <el-button v-permission="['alarm:handle']" type="primary" size="large" class="flex-1" @click="handleAction('process')">
               立即接单
             </el-button>
-            <el-button type="warning" size="large" class="flex-1" @click="handleAction('transfer')">
+            <el-button v-permission="['alarm:handle']" type="warning" size="large" class="flex-1" @click="handleAction('transfer')">
               转工单
+            </el-button>
+            <el-button v-permission="['alarm:supervise']" type="danger" size="large" class="flex-1" @click="handleAction('supervise')">
+              督办
             </el-button>
           </div>
           <div class="flex space-x-4 mb-4" v-else>
@@ -95,7 +98,7 @@
             placeholder="请输入处理备注/跟进情况..."
           />
           <div class="mt-4 text-right" v-if="alarmData.status !== 'CLOSED'">
-             <el-button type="success" @click="handleAction('complete')">完成处理</el-button>
+             <el-button v-permission="['alarm:handle']" type="success" @click="handleAction('complete')">完成处理</el-button>
           </div>
         </el-card>
 
@@ -126,7 +129,8 @@ import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Clock, Location, VideoCamera } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
-import { getAlarmDetail } from '../../api/alarm'
+import { closeAlarm, getAlarmDetail, processAlarm, superviseAlarm, transferAlarm } from '../../api/alarm'
+import { useAuthStore } from '../../stores/auth'
 
 const route = useRoute()
 const router = useRouter()
@@ -135,6 +139,45 @@ const remark = ref('')
 
 const alarmData = ref<any>({})
 const activities = ref<any[]>([])
+const authStore = useAuthStore()
+
+const toTimelineItem = (action: any) => {
+  const actionType = action.actionType
+  const map: any = {
+    PROCESS: { title: '接单响应', type: 'primary' },
+    TRANSFER: { title: '转工单', type: 'warning' },
+    CLOSE: { title: '关闭告警', type: 'success' },
+    SUPERVISE: { title: '督办', type: 'danger' }
+  }
+  const meta = map[actionType] || { title: actionType || '操作', type: 'info' }
+  return {
+    title: meta.title,
+    type: meta.type,
+    content: action.note || '-',
+    timestamp: action.createdAt ? new Date(action.createdAt).toLocaleString() : '',
+    operator: action.operatorName || ''
+  }
+}
+
+const applyDetail = (res: any) => {
+  alarmData.value = {
+    id: res.id,
+    title: `${res.type || '告警'} - ${res.deviceId}`,
+    level: res.level || 'RED',
+    status: res.status || 'PENDING',
+    type: res.type,
+    deviceNo: res.deviceId,
+    location: res.location || '未知位置',
+    triggerTime: res.occurredAt,
+    content: res.description,
+    duration: '-',
+    value: '-',
+    threshold: '-',
+    possibleCause: '-'
+  }
+
+  activities.value = (res.actions || []).map(toTimelineItem)
+}
 
 const loadData = async () => {
   loading.value = true
@@ -142,26 +185,7 @@ const loadData = async () => {
   
   try {
     const res: any = await getAlarmDetail(id as string)
-    
-    // Mapping API response to UI model
-    alarmData.value = {
-      id: res.id,
-      title: `${res.type || '告警'} - ${res.deviceId}`,
-      level: res.level || 'RED', // Default or from API
-      status: res.status || 'PENDING', // Backend missing status, default to PENDING
-      type: res.type,
-      deviceNo: res.deviceId,
-      location: '未知位置', // Backend missing location in AlarmDto?
-      triggerTime: res.occurredAt,
-      content: res.description,
-      duration: '-', // Backend missing duration
-      value: '-',
-      threshold: '-',
-      possibleCause: '-'
-    }
-
-    // Backend missing activities/history, leaving empty for now
-    activities.value = []
+    applyDetail(res)
     
   } catch (error) {
     console.error(error)
@@ -171,34 +195,62 @@ const loadData = async () => {
   }
 }
 
-const handleAction = (type: string) => {
-  if (type === 'process') {
-    ElMessage.success('接单成功')
-    alarmData.value.status = 'PROCESSING'
-    activities.value.unshift({
-      content: '技术员已确认接单，正在前往现场',
-      timestamp: new Date().toLocaleString(),
-      title: '接单响应',
-      type: 'primary',
-      operator: 'Admin'
-    })
-  } else if (type === 'complete') {
-    if (!remark.value) {
-      ElMessage.warning('请填写处理备注')
+const handleAction = async (type: string) => {
+  const id = route.params.id as string
+  try {
+    if (type === 'process') {
+      if (!authStore.hasPermission('alarm:handle')) {
+        ElMessage.warning('无权限操作')
+        return
+      }
+      const res: any = await processAlarm(id)
+      applyDetail(res)
+      ElMessage.success('接单成功')
       return
     }
-    ElMessage.success('处理已完成')
-    alarmData.value.status = 'CLOSED'
-     activities.value.unshift({
-      content: '故障已排除。备注：' + remark.value,
-      timestamp: new Date().toLocaleString(),
-      title: '关闭告警',
-      type: 'success',
-      operator: 'Admin'
-    })
-    remark.value = ''
-  } else {
+
+    if (type === 'complete') {
+      if (!authStore.hasPermission('alarm:handle')) {
+        ElMessage.warning('无权限操作')
+        return
+      }
+      if (!remark.value) {
+        ElMessage.warning('请填写处理备注')
+        return
+      }
+      const res: any = await closeAlarm(id, { note: remark.value })
+      applyDetail(res)
+      remark.value = ''
+      ElMessage.success('处理已完成')
+      return
+    }
+
+    if (type === 'transfer') {
+      if (!authStore.hasPermission('alarm:handle')) {
+        ElMessage.warning('无权限操作')
+        return
+      }
+      const res: any = await transferAlarm(id, remark.value ? { note: remark.value } : undefined)
+      applyDetail(res)
+      ElMessage.success('已记录转工单动作（demo）')
+      return
+    }
+
+    if (type === 'supervise') {
+      if (!authStore.hasPermission('alarm:supervise')) {
+        ElMessage.warning('无权限操作')
+        return
+      }
+      const res: any = await superviseAlarm(id, remark.value ? { note: remark.value } : undefined)
+      applyDetail(res)
+      ElMessage.success('督办已提交')
+      return
+    }
+
     ElMessage.info('功能开发中')
+  } catch (e: any) {
+    console.error(e)
+    ElMessage.error(e?.response?.data?.message || '操作失败')
   }
 }
 

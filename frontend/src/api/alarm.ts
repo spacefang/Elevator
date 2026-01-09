@@ -17,3 +17,19 @@ export const getAlarmList = (params: AlarmParams) => {
 export const getAlarmDetail = (id: number | string) => {
     return request.get(`/api/alarms/${id}`)
 }
+
+export const processAlarm = (id: number | string, data?: { note?: string }) => {
+    return request.post(`/api/alarms/${id}/process`, data || {})
+}
+
+export const closeAlarm = (id: number | string, data: { note: string }) => {
+    return request.post(`/api/alarms/${id}/close`, data)
+}
+
+export const transferAlarm = (id: number | string, data?: { note?: string }) => {
+    return request.post(`/api/alarms/${id}/transfer`, data || {})
+}
+
+export const superviseAlarm = (id: number | string, data?: { note?: string }) => {
+    return request.post(`/api/alarms/${id}/supervise`, data || {})
+}

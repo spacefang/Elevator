@@ -5,6 +5,8 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -28,6 +30,13 @@ public class Alarm {
 
   @Column(name = "description", columnDefinition = "text")
   private String description;
+
+  @Column(name = "location", length = 255)
+  private String location;
+
+  @Enumerated(EnumType.STRING)
+  @Column(name = "status", nullable = false, length = 32)
+  private AlarmStatus status = AlarmStatus.PENDING;
 
   @Column(name = "occurred_at", nullable = false)
   private Instant occurredAt;
@@ -86,5 +95,25 @@ public class Alarm {
 
   public Instant getCreatedAt() {
     return createdAt;
+  }
+
+  public Instant getUpdatedAt() {
+    return updatedAt;
+  }
+
+  public String getLocation() {
+    return location;
+  }
+
+  public void setLocation(String location) {
+    this.location = location;
+  }
+
+  public AlarmStatus getStatus() {
+    return status;
+  }
+
+  public void setStatus(AlarmStatus status) {
+    this.status = status;
   }
 }

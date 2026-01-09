@@ -19,6 +19,11 @@ deploy/.env
 **/.classpath
 **/.project
 **/.settings/
+*.log
+*.pid
+*.log
+*.pid
+*.hprof
 
 # Frontend (Vue)
 **/node_modules/
@@ -26,4 +31,3 @@ deploy/.env
 **/.pnpm-store/
 **/.npm/
 **/.yarn/
-

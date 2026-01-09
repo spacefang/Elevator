@@ -201,7 +201,7 @@ public class MqttIngestService implements MqttCallbackExtended, SmartLifecycle {
         alarm -> {
           Alarm entity = new Alarm();
           entity.setDeviceId(telemetry.deviceId());
-          entity.setLevel(alarm.level());
+          entity.setLevel(normalizeLevel(alarm.level()));
           entity.setType(alarm.type());
           entity.setDescription(alarm.description());
           entity.setOccurredAt(seenAt);
@@ -219,9 +219,10 @@ public class MqttIngestService implements MqttCallbackExtended, SmartLifecycle {
     Instant occurredAt = Instant.ofEpochMilli(alert.timestampMs());
     Alarm entity = new Alarm();
     entity.setDeviceId(alert.deviceId());
-    entity.setLevel(alert.alertLevel());
+    entity.setLevel(normalizeLevel(alert.alertLevel()));
     entity.setType(alert.alertType());
     entity.setDescription(alert.alertDesc());
+    entity.setLocation(alert.location());
     entity.setOccurredAt(occurredAt);
     alarmRepository.save(entity);
 
@@ -252,5 +253,12 @@ public class MqttIngestService implements MqttCallbackExtended, SmartLifecycle {
         log.debug("Failed to update redis online=false", e);
       }
     }
+  }
+
+  private static String normalizeLevel(String level) {
+    if (level == null) {
+      return null;
+    }
+    return level.trim().toUpperCase();
   }
 }

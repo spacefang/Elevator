@@ -53,6 +53,7 @@
           <template #default="{ row }">
             <el-button link type="primary" @click="viewDetail(row.id)">详情</el-button>
             <el-button 
+              v-permission="['alarm:handle']"
               v-if="row.status !== 'CLOSED'"
               link 
               type="primary" 
@@ -113,8 +114,17 @@ const loadData = async () => {
       page: pagination.page - 1, 
       size: pagination.size 
     })
-    
-    tableData.value = res.content
+
+    tableData.value = (res.content || []).map((a: any) => ({
+      id: a.id,
+      level: a.level,
+      type: a.type,
+      deviceNo: a.deviceId,
+      location: a.location || '-',
+      content: a.description,
+      triggerTime: a.occurredAt,
+      status: a.status
+    }))
     pagination.total = res.totalElements
     loading.value = false
   } catch (error) {

@@ -1,8 +1,9 @@
 package com.elevator.ops.backend.web.alarm;
 
 import java.time.Instant;
+import java.util.List;
 
-public record AlarmDto(
+public record AlarmDetailDto(
     long id,
     String deviceId,
     String location,
@@ -11,4 +12,6 @@ public record AlarmDto(
     String type,
     String description,
     Instant occurredAt,
-    Instant createdAt) {}
+    Instant createdAt,
+    List<AlarmActionDto> actions) {}
+

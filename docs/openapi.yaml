@@ -108,9 +108,143 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AlarmDto"
+                $ref: "#/components/schemas/AlarmDetailDto"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/alarms/{id}/process:
+    post:
+      tags: [Alarms]
+      summary: City operator process alarm (set status PROCESSING)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer, format: int64 }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AlarmActionRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AlarmDetailDto"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/alarms/{id}/close:
+    post:
+      tags: [Alarms]
+      summary: City operator close alarm (set status CLOSED)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer, format: int64 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AlarmActionRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AlarmDetailDto"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/alarms/{id}/transfer:
+    post:
+      tags: [Alarms]
+      summary: City operator transfer alarm to workorder (demo action only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer, format: int64 }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AlarmActionRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AlarmDetailDto"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /api/alarms/{id}/supervise:
+    post:
+      tags: [Alarms]
+      summary: Province supervisor supervise alarm (demo action only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer, format: int64 }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AlarmActionRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AlarmDetailDto"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
 
@@ -201,6 +335,12 @@ components:
         application/json:
           schema:
             $ref: "#/components/schemas/ErrorResponse"
+    Forbidden:
+      description: Forbidden
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
     Unauthorized:
       description: Unauthorized
       content:
@@ -251,15 +391,44 @@ components:
 
     AlarmDto:
       type: object
-      required: [id, deviceId, level, type, occurredAt, createdAt]
+      required: [id, deviceId, level, status, type, occurredAt, createdAt]
       properties:
         id: { type: integer, format: int64 }
         deviceId: { type: string }
-        level: { type: string, example: red }
+        location: { type: string, nullable: true }
+        level: { type: string, example: RED, enum: [RED, ORANGE, YELLOW] }
+        status: { type: string, example: PENDING, enum: [PENDING, PROCESSING, CLOSED] }
         type: { type: string, example: trapped }
         description: { type: string, nullable: true }
         occurredAt: { type: string, format: date-time }
         createdAt: { type: string, format: date-time }
+
+    AlarmActionRequest:
+      type: object
+      properties:
+        note: { type: string, nullable: true }
+
+    AlarmActionDto:
+      type: object
+      required: [id, actionType, operatorUserId, operatorName, operatorRole, createdAt]
+      properties:
+        id: { type: integer, format: int64 }
+        actionType: { type: string, enum: [PROCESS, TRANSFER, CLOSE, SUPERVISE] }
+        note: { type: string, nullable: true }
+        operatorUserId: { type: string }
+        operatorName: { type: string }
+        operatorRole: { type: string }
+        createdAt: { type: string, format: date-time }
+
+    AlarmDetailDto:
+      allOf:
+        - $ref: "#/components/schemas/AlarmDto"
+        - type: object
+          required: [actions]
+          properties:
+            actions:
+              type: array
+              items: { $ref: "#/components/schemas/AlarmActionDto" }
 
     PageAlarmDto:
       type: object
